@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  project: default
+  sources:
+  - repoURL: 'https://prometheus-community.github.io/helm-charts'
+    chart: kube-prometheus-stack
+    targetRevision: 56.3.0
+    helm:
+      valueFiles:
+      - $values/argocd/helm/values/kube-prometheus-stack-values.yaml
+  - repoURL: 'git@github.com:lourash-hub/terraform-aws-pipeline.git'
+    targetRevision: main
+    ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - Validate=true
+      - ServerSideApply=true
+  destination:
+    server: "https://kubernetes.default.svc"
+    namespace: monitoring
