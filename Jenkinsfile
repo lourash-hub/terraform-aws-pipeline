@@ -6,40 +6,74 @@ pipeline {
     }
 
     stages {
-        stage('Checkout') {
+        stage("Checkout") {
             steps {
                 script {
+                    echo 'Checking out code from Git'
                     checkout scm
+                    echo 'Checked out code from Git'
                 }
             }
         }
 
-        stage('Terraform Plan') {
+        stage("Lint Code") {
             steps {
                 script {
+                    echo 'Running Terraform Validation for lint'
                     withCredentials([aws(credentialsId: 'AWS_CRED', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
                         sh 'terraform init'
-                        sh 'terraform plan -out=tfplan'
+                        echo 'Terraform initialized'
+                        echo 'Running terraform validate'
+                        sh 'terraform validate'
+                        echo 'Terraform validation completed'
                     }
                 }
             }
         }
 
-        stage('Terraform Apply') {
+        stage("Terraform Plan") {
+            steps {
+                script {
+                    echo 'Running Terraform plan'
+                    withCredentials([aws(credentialsId: 'AWS_CRED', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                        sh 'terraform plan -out=tfplan'
+                        echo 'Terraform plan completed'
+                    }
+                }
+            }
+        }
+
+        stage("Terraform Apply") {
             when {
                 expression { env.BRANCH_NAME == 'main' }
                 expression { currentBuild.rawBuild.getCause(hudson.model.Cause$UserIdCause) != null }
             }
             steps {
                 script {
-        //             // Ask for manual confirmation before applying changes
+                    echo "Requesting manual approval to apply changes"
                     input message: 'Do you want to apply changes?', ok: 'Yes'
                     withCredentials([aws(credentialsId: 'AWS_CRED', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-                        sh 'terraform init'
-                        sh 'terraform apply tfplan'
+                        echo "Applying changes to infrastructure using Terraform"
+                        if (fileExists('tfplan')) {
+                            sh 'terraform apply tfplan'
+                            echo "Terraform apply completed"
+                        } else {
+                            echo "Plan file does not exist, skipping apply."
+                        }
                     }
                 }
             }
+        }
+    }
+    post {
+        always {
+            echo 'Cleaning up Terraform files'
+            sh 'rm -rf .terraform'
+            sh 'rm -rf tfplan'
+            echo 'Cleaned up Terraform files'
+        }
+        failure {
+            echo 'Terraform apply failed'
         }
     }
 }
