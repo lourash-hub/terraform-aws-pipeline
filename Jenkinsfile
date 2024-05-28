@@ -1,6 +1,8 @@
 pipeline {
     agent any
-
+    triggers {
+        githubPush()
+    }
     environment {
         TF_CLI_ARGS = '-no-color'
     }
