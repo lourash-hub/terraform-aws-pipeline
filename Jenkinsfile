@@ -66,6 +66,25 @@ pipeline {
                 }
             }
         }
+
+        stage("Terraform Destroy") {
+            when {
+                expression { env.BRANCH_NAME == 'main' }
+                expression { currentBuild.rawBuild.getCause(hudson.model.Cause$UserIdCause) != null }
+            }
+            steps {
+                script {
+                    echo "Waiting for specified delay before destroying resources"
+                    sleep time: 1, unit: 'HOURS'
+                    echo "Now destroying the resources"
+                    withCredentials([aws(credentialsId: 'AWS_CRED', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY')]) {
+                        echo "Destroying infrastructure using Terraform"
+                        sh 'terraform destroy -auto-approve'
+                        echo "Terraform destroy completed"
+                    }
+                }
+            }
+        }
     }
     post {
         always {
